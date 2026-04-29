@@ -126,6 +126,33 @@
       letter-spacing: 0.5px;
     }
     #play-btn:hover { background: #f2693a; }
+
+    #diff-btns {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      justify-content: center;
+    }
+
+    .diff-btn {
+      font-family: 'Baloo 2', cursive;
+      font-size: 0.88rem;
+      font-weight: 700;
+      border: 2.5px solid transparent;
+      border-radius: 999px;
+      padding: 7px 18px;
+      cursor: pointer;
+      pointer-events: all;
+      transition: transform 0.12s, box-shadow 0.12s;
+      letter-spacing: 0.3px;
+    }
+    .diff-btn:hover { transform: scale(1.07); }
+
+    .diff-btn.easy   { background: #b7e4a0; color: #3a6e2a; border-color: #88c98a; }
+    .diff-btn.medium { background: var(--sun); color: #7a4f1a; border-color: #f0a840; }
+    .diff-btn.hard   { background: #f4a0a0; color: #7a1a1a; border-color: #e07070; }
+
+    .diff-btn.selected { box-shadow: 0 0 0 3px rgba(107,79,58,0.25); transform: scale(1.1); }
   </style>
 </head>
 <body>
@@ -140,11 +167,16 @@
   <canvas id="c"></canvas>
   <div id="overlay">
     <div id="msg-box">
-      <div id="msg-title">Hello!</div>
-      <div id="msg-sub">Help the fluffy bird fly 🌸</div>
+      <div id="msg-title">🐣 Fluffy Bird</div>
+      <div id="msg-sub">choose your difficulty</div>
       <div id="msg-score" style="display:none"></div>
+      <div id="diff-btns">
+        <button class="diff-btn easy"   onclick="pickDiff('easy')">🌿 Easy</button>
+        <button class="diff-btn medium" onclick="pickDiff('medium')">🌤 Medium</button>
+        <button class="diff-btn hard"   onclick="pickDiff('hard')">🔥 Hard</button>
+      </div>
     </div>
-    <div id="tap-hint">tap / spacebar to flap</div>
+    <div id="tap-hint" style="display:none">tap / spacebar to flap</div>
     <div id="play-btn" style="display:none">▶ Play Again</div>
   </div>
 </div>
@@ -187,34 +219,33 @@ const GROUND_H = Math.round(H * 0.12);
 const PIPE_W   = Math.round(W * 0.13);
 const BIRD_R   = Math.round(W * 0.065);
 
-// Exponential progression — t = score, curve bends sharply after ~10 points
-// factor goes from 0 at score=0 toward 1 asymptotically
-function easeFactor(s) { return 1 - Math.exp(-s * 0.09); }
+/* ── difficulty presets ── */
+const DIFF = {
+  easy:   { k: 0.045, speedBase: 0.8,  speedMax: 2.2,  gapBase: 0.50, gapMin: 0.30, intBase: 3400, intMin: 1800, gravBase: 0.08, gravMax: 0.18, jumpBase: -3.0, jumpMax: -4.8 },
+  medium: { k: 0.09,  speedBase: 1.0,  speedMax: 3.2,  gapBase: 0.46, gapMin: 0.24, intBase: 3000, intMin: 1400, gravBase: 0.10, gravMax: 0.26, jumpBase: -3.4, jumpMax: -5.8 },
+  hard:   { k: 0.18,  speedBase: 1.4,  speedMax: 4.2,  gapBase: 0.40, gapMin: 0.19, intBase: 2400, intMin: 1100, gravBase: 0.14, gravMax: 0.34, jumpBase: -3.8, jumpMax: -6.8 },
+};
+let difficulty = 'medium';
+let D = DIFF[difficulty];
+
+function easeFactor(s) { return 1 - Math.exp(-s * D.k); }
 
 function getGap() {
-  const BASE = H * 0.46;   // very wide at start
-  const MIN  = H * 0.24;   // tightest gap
+  const BASE = H * D.gapBase;
+  const MIN  = H * D.gapMin;
   return Math.round(BASE - (BASE - MIN) * easeFactor(score));
 }
 function getInterval() {
-  const BASE = 3000;        // pipes very far apart at start (ms)
-  const MIN  = 1400;        // closest spacing
-  return Math.round(BASE - (BASE - MIN) * easeFactor(score));
+  return Math.round(D.intBase - (D.intBase - D.intMin) * easeFactor(score));
 }
 function getSpeed() {
-  const BASE = 1.0;         // very slow at start
-  const MAX  = 3.2;         // fastest
-  return BASE + (MAX - BASE) * easeFactor(score);
+  return D.speedBase + (D.speedMax - D.speedBase) * easeFactor(score);
 }
 function getGravity() {
-  const BASE = 0.10;        // floaty at start
-  const MAX  = 0.26;        // snappier later
-  return BASE + (MAX - BASE) * easeFactor(score);
+  return D.gravBase + (D.gravMax - D.gravBase) * easeFactor(score);
 }
 function getJump() {
-  const BASE = -3.4;        // gentle flap at start
-  const MAX  = -5.8;        // stronger flap later
-  return BASE + (MAX - BASE) * easeFactor(score);
+  return D.jumpBase + (D.jumpMax - D.jumpBase) * easeFactor(score);
 }
 
 /* ── clouds (decorative) ── */
@@ -254,9 +285,8 @@ function startGame() {
 }
 
 function flap() {
-  if (state === 'idle') { startGame(); return; }
-  if (state === 'dead')  { startGame(); return; }
-  bird.vy = getJump();
+  if (state === 'dead')    { showIdle(); return; }
+  if (state === 'playing') { bird.vy = getJump(); }
 }
 
 canvas.addEventListener('click', flap);
@@ -447,25 +477,35 @@ function collides() {
 }
 
 /* ── overlay helpers ── */
+function pickDiff(d) {
+  difficulty = d;
+  D = DIFF[d];
+  // highlight selected button
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector(`.diff-btn.${d}`).classList.add('selected');
+  startGame();
+}
+
+function showIdle() {
+  msgTitle.textContent   = '🐣 Fluffy Bird';
+  msgSub.textContent     = 'choose your difficulty';
+  msgScore.style.display = 'none';
+  document.getElementById('diff-btns').style.display = 'flex';
+  playBtn.style.display  = 'none';
+  document.getElementById('tap-hint').style.display = 'none';
+  overlay.classList.remove('dead');
+  overlay.style.display  = 'flex';
+}
+
 function showDead() {
   const isNew = score >= best && score > 0;
   msgTitle.textContent   = isNew && score > 1 ? '✨ New Best!' : '🌿 Game Over';
   msgSub.textContent     = `Score: ${score}`;
   msgScore.style.display = 'none';
-  playBtn.style.display  = 'block';
-  playBtn.textContent    = 'PLAY AGAIN';
-  document.getElementById('tap-hint').style.display = 'none';
-  overlay.classList.add('dead');
-  overlay.style.display  = 'flex';
-}
-
-function showIdle() {
-  msgTitle.textContent   = '🐣 Fluffy Bird';
-  msgSub.textContent     = 'click to flap';
-  msgScore.style.display = 'none';
+  document.getElementById('diff-btns').style.display = 'flex';
   playBtn.style.display  = 'none';
   document.getElementById('tap-hint').style.display = 'none';
-  overlay.classList.remove('dead');
+  overlay.classList.add('dead');
   overlay.style.display  = 'flex';
 }
 
