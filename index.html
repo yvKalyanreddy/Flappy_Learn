@@ -258,7 +258,7 @@ const clouds = Array.from({length:5}, (_,i) => ({
 
 /* ── state ── */
 let state = 'idle'; // idle | playing | dead
-let bird, pipes, score, best, frame;
+let bird, pipes, score, frame;
 
 function reset() {
   bird = { x: W * 0.28, y: H * 0.42, vy: 0, wing: 0, angle: 0 };
@@ -480,9 +480,9 @@ function collides() {
 function pickDiff(d) {
   difficulty = d;
   D = DIFF[d];
-  // highlight selected button
   document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
   document.querySelector(`.diff-btn.${d}`).classList.add('selected');
+  updateBestDisplay();
   startGame();
 }
 
@@ -498,7 +498,7 @@ function showIdle() {
 }
 
 function showDead() {
-  const isNew = score >= best && score > 0;
+  const isNew = score >= getBest() && score > 0;
   msgTitle.textContent   = isNew && score > 1 ? '✨ New Best!' : '🌿 Game Over';
   msgSub.textContent     = `Score: ${score}`;
   msgScore.style.display = 'none';
@@ -511,8 +511,14 @@ function showDead() {
 
 /* ── game loop ── */
 let lastPipe = 0;
-best = parseInt(localStorage.getItem('fluffyBest') || '0');
-bestEl.textContent = best;
+
+const bests = {
+  easy:   parseInt(localStorage.getItem('fluffyBest_easy')   || '0'),
+  medium: parseInt(localStorage.getItem('fluffyBest_medium') || '0'),
+  hard:   parseInt(localStorage.getItem('fluffyBest_hard')   || '0'),
+};
+function getBest() { return bests[difficulty]; }
+function updateBestDisplay() { bestEl.textContent = getBest(); }
 
 function loop(ts) {
   frame = requestAnimationFrame(loop);
@@ -540,10 +546,10 @@ function loop(ts) {
         p.scored = true;
         score++;
         liveEl.textContent = score;
-        if (score > best) {
-          best = score;
-          bestEl.textContent = best;
-          localStorage.setItem('fluffyBest', best);
+        if (score > getBest()) {
+          bests[difficulty] = score;
+          updateBestDisplay();
+          localStorage.setItem(`fluffyBest_${difficulty}`, score);
         }
       }
     });
@@ -568,6 +574,7 @@ function loop(ts) {
   if (state === 'playing') drawScore();
 }
 
+updateBestDisplay();
 showIdle();
 reset();
 frame = requestAnimationFrame(loop);
