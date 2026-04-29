@@ -3,7 +3,7 @@ A cosy, aesthetic take on the classic Flappy Bird — soft pastel colours, a gen
 
 🎮 How to Play
 
-Click, press Space, Enter, or ↑ to flap
+Select the desired Difficulty and start to flap
 Fly through the gaps between the pipes without hitting them
 Each pipe you clear scores you a point
 The gaps start wide and gradually get narrower as your score increases
@@ -18,7 +18,7 @@ Progressive difficulty — pipes start far apart with big gaps and slowly get cl
 Persistent best score saved to localStorage
 Game over screen showing your current score and a PLAY AGAIN button
 Fully responsive — scales to fit mobile screens
-
+Buttons to change Difficulty at the start of every Run
 
 🚀 Deploying to AWS Amplify
 This project is a single static HTML file — no build step required.
