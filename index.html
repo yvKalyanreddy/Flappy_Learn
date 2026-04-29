@@ -185,17 +185,37 @@ const TEXTC  = '#6b4f3a';
 /* ── constants ── */
 const GROUND_H = Math.round(H * 0.12);
 const PIPE_W   = Math.round(W * 0.13);
-const BASE_GAP  = Math.round(H * 0.42);  // starting gap (very generous)
-const MIN_GAP   = Math.round(H * 0.26);  // minimum gap after many pipes
-const BASE_INTERVAL = 2600;              // ms between pipes at start
-const MIN_INTERVAL  = 1600;             // minimum interval
-
-function getGap()      { return Math.max(MIN_GAP, BASE_GAP - score * 4); }
-function getInterval() { return Math.max(MIN_INTERVAL, BASE_INTERVAL - score * 30); }
-const GRAVITY  = 0.15;
-const JUMP_V   = -4.2;
-const SPEED    = 1.6;
 const BIRD_R   = Math.round(W * 0.065);
+
+// Exponential progression — t = score, curve bends sharply after ~10 points
+// factor goes from 0 at score=0 toward 1 asymptotically
+function easeFactor(s) { return 1 - Math.exp(-s * 0.09); }
+
+function getGap() {
+  const BASE = H * 0.46;   // very wide at start
+  const MIN  = H * 0.24;   // tightest gap
+  return Math.round(BASE - (BASE - MIN) * easeFactor(score));
+}
+function getInterval() {
+  const BASE = 3000;        // pipes very far apart at start (ms)
+  const MIN  = 1400;        // closest spacing
+  return Math.round(BASE - (BASE - MIN) * easeFactor(score));
+}
+function getSpeed() {
+  const BASE = 1.0;         // very slow at start
+  const MAX  = 3.2;         // fastest
+  return BASE + (MAX - BASE) * easeFactor(score);
+}
+function getGravity() {
+  const BASE = 0.10;        // floaty at start
+  const MAX  = 0.26;        // snappier later
+  return BASE + (MAX - BASE) * easeFactor(score);
+}
+function getJump() {
+  const BASE = -3.4;        // gentle flap at start
+  const MAX  = -5.8;        // stronger flap later
+  return BASE + (MAX - BASE) * easeFactor(score);
+}
 
 /* ── clouds (decorative) ── */
 const clouds = Array.from({length:5}, (_,i) => ({
@@ -230,13 +250,13 @@ function startGame() {
   overlay.style.display = 'none';
   lastPipe = 0;
   reset();
-  bird.vy = JUMP_V;
+  bird.vy = getJump();
 }
 
 function flap() {
   if (state === 'idle') { startGame(); return; }
   if (state === 'dead')  { startGame(); return; }
-  bird.vy = JUMP_V;
+  bird.vy = getJump();
 }
 
 canvas.addEventListener('click', flap);
@@ -464,14 +484,14 @@ function loop(ts) {
   });
 
   if (state === 'playing') {
-    bird.vy    += GRAVITY;
+    bird.vy    += getGravity();
     bird.y     += bird.vy;
     bird.angle  = bird.vy * 0.075;
     bird.wing   = ts * 0.018;
 
     // pipes
     if (!lastPipe || ts - lastPipe > getInterval()) { addPipe(); lastPipe = ts; }
-    pipes.forEach(p => p.x -= SPEED);
+    pipes.forEach(p => p.x -= getSpeed());
     pipes = pipes.filter(p => p.x + PIPE_W > 0);
 
     // score
